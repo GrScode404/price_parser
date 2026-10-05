@@ -1,53 +1,125 @@
+
 import asyncio
+import json
 
 import aiohttp
-
 from lxml import html
 
-import json
+
+MAX_ATTEMPTS = 3
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+
 
 def load_urls(filename: str) -> list[str]:
     with open(filename, "r") as file:
-        urls = [line.strip() for line in file]
-    return urls
+        return [line.strip() for line in file if line.strip()]
 
-def parse_price(content: str) -> str:
-    tree = html.fromstring(content)
-
-    json_text = tree.xpath("string(//pre)")
-    data = json.loads(json_text)
-
-    return data["price"]
 
 async def fetch(
-        session: aiohttp.ClientSession, 
-        url: str,
-        semaphore: asyncio.Semaphore,
+    session: aiohttp.ClientSession,
+    url: str,
+    semaphore: asyncio.Semaphore,
 ) -> str:
-    async with semaphore:
-        async with session.get(url) as response:
-            return await response.text()
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        retry_delay = 2 ** (attempt - 1)
+
+        try:
+            async with semaphore:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        return await response.text()
+
+                    if (
+                        response.status in RETRYABLE_STATUS
+                        and attempt < MAX_ATTEMPTS
+                    ):
+                        retry_after = response.headers.get("Retry-After")
+
+                        if retry_after:
+                            try:
+                                retry_delay = float(retry_after)
+                            except ValueError:
+                                pass
+                    else:
+                        response.raise_for_status()
+
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            if (
+                isinstance(exc, aiohttp.ClientResponseError)
+                and exc.status not in RETRYABLE_STATUS
+            ):
+                raise
+
+            if attempt == MAX_ATTEMPTS:
+                raise
+
+        if attempt < MAX_ATTEMPTS:
+            print(
+                f"Повтор {attempt + 1}/{MAX_ATTEMPTS}: "
+                f"{url}. Ждём {retry_delay} сек."
+            )
+            await asyncio.sleep(retry_delay)
+
+    raise RuntimeError(f"Не удалось получить страницу: {url}")
+
+
+def parse_price(content: str) -> float:
+    tree = html.fromstring(content)
+    json_text = tree.xpath("string(//pre)")
+
+    if not json_text.strip():
+        raise ValueError("На странице не найден JSON с данными товара")
+
+    data = json.loads(json_text)
+    price = data.get("price")
+
+    if isinstance(price, bool) or not isinstance(price, (int, float)):
+        raise ValueError("Цена отсутствует или имеет неверный формат")
+
+    if price < 0:
+        raise ValueError(f"Цена не может быть отрицательной: {price}")
+
+    return float(price)
+
+
+async def process_product(
+    session: aiohttp.ClientSession,
+    url: str,
+    semaphore: asyncio.Semaphore,
+) -> bool:
+    try:
+        content = await fetch(session, url, semaphore)
+        price = parse_price(content)
+
+    except Exception as exc:
+        print(f"ОШИБКА: {url} — {type(exc).__name__}: {exc}")
+        return False
+
+    print(f"URL: {url}, Price: {price}")
+    return True
+
 
 async def main() -> None:
     urls = load_urls("products.txt")
     semaphore = asyncio.Semaphore(10)
+    timeout = aiohttp.ClientTimeout(total=15)
 
-    async with aiohttp.ClientSession() as session:
-        tasks = [
-            fetch(session, url, semaphore) 
-            for url in urls
-        ]
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        results = await asyncio.gather(
+            *[
+                process_product(session, url, semaphore)
+                for url in urls
+            ]
+        )
 
-        results = await asyncio.gather(*tasks)
+    successful = sum(results)
+    failed = len(results) - successful
 
-    print("Получено страниц:", len(results))
+    print("\nИтоги запуска:")
+    print(f"Всего товаров: {len(urls)}")
+    print(f"Успешно обработано: {successful}")
+    print(f"Ошибок: {failed}")
 
-    for url, content in zip(urls, results):
-        price = parse_price(content)
-        print(f"URL: {url}, Price: {price}")
-
-
-    
 
 if __name__ == "__main__":
     asyncio.run(main())

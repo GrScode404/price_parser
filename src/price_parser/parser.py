@@ -3,7 +3,10 @@ import asyncio
 import json
 
 import aiohttp
+import redis.asyncio as redis
 from lxml import html
+
+from price_parser.storage import RedisStorage
 
 
 MAX_ATTEMPTS = 3
@@ -86,10 +89,14 @@ async def process_product(
     session: aiohttp.ClientSession,
     url: str,
     semaphore: asyncio.Semaphore,
+    storage: RedisStorage,
 ) -> bool:
     try:
         content = await fetch(session, url, semaphore)
         price = parse_price(content)
+
+        product_id = url.rstrip("/").split("/")[-1]
+        await storage.save_price(int(product_id), price)
 
     except Exception as exc:
         print(f"ОШИБКА: {url} — {type(exc).__name__}: {exc}")
@@ -104,13 +111,29 @@ async def main() -> None:
     semaphore = asyncio.Semaphore(10)
     timeout = aiohttp.ClientTimeout(total=15)
 
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        results = await asyncio.gather(
-            *[
-                process_product(session, url, semaphore)
-                for url in urls
-            ]
-        )
+    redis_client = redis.Redis(
+        host="localhost",
+        port=6379,
+        db=0,
+        decode_responses=True,
+    )
+    storage = RedisStorage(redis_client)
+
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            results = await asyncio.gather(
+                *[
+                    process_product(
+                        session,
+                        url, 
+                        semaphore,
+                        storage
+                    )
+                    for url in urls
+                ]
+            )
+    finally:
+        await redis_client.aclose()
 
     successful = sum(results)
     failed = len(results) - successful

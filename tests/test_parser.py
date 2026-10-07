@@ -88,8 +88,14 @@ def test_process_product_handles_fetch_error(monkeypatch):
     async def run_test():
         session = AsyncMock()
         semaphore = asyncio.Semaphore(1)
+        storage = AsyncMock()
 
-        async def fake_fetch(session, url, semaphore):
+        async def fake_fetch(
+                session, 
+                url, 
+                semaphore,
+                storage,
+            ):
             raise RuntimeError("Connection failed")
 
         monkeypatch.setattr(parser, "fetch", fake_fetch)
@@ -98,6 +104,7 @@ def test_process_product_handles_fetch_error(monkeypatch):
             session,
             "https://example.com/product/1",
             semaphore,
+            storage,
         )
 
         assert result is False
@@ -108,8 +115,13 @@ def test_process_product_succeeds(monkeypatch):
     async def run_test():
         session = AsyncMock()
         semaphore = asyncio.Semaphore(1)
+        storage = AsyncMock()
 
-        async def fake_fetch(session, url, semaphore):
+        async def fake_fetch(
+                session, 
+                url, 
+                semaphore,
+            ):
             return """
             <html><body>
                 <pre>{"id": 1, "price": 123.45}</pre>
@@ -122,8 +134,9 @@ def test_process_product_succeeds(monkeypatch):
             session,
             "https://example.com/product/1",
             semaphore,
+            storage,
         )
-
+    
         assert result is True
 
     asyncio.run(run_test())
@@ -244,5 +257,55 @@ def test_fetch_stops_after_max_attempts(monkeypatch):
             unittest.mock.call(1),
             unittest.mock.call(2),
         ]
+
+    asyncio.run(run_test())
+
+def test_process_product_saves_price(monkeypatch):
+    async def run_test():
+        session = AsyncMock()
+        semaphore = asyncio.Semaphore(1)
+        storage = AsyncMock()
+
+        async def fake_fetch(session, url, semaphore):
+            return """
+            <html><body>
+                <pre>{"id": 42, "price": 123.45}</pre>
+            </body></html>
+            """
+
+        monkeypatch.setattr(parser, "fetch", fake_fetch)
+
+        result = await parser.process_product(
+            session,
+            "https://example.com/product/42",
+            semaphore,
+            storage,
+        )
+
+        assert result is True
+        storage.save_price.assert_awaited_once_with(42, 123.45)
+
+    asyncio.run(run_test())
+
+def test_process_product_does_not_save_price_on_fetch_error(monkeypatch):
+    async def run_test():
+        session = AsyncMock()
+        semaphore = asyncio.Semaphore(1)
+        storage = AsyncMock()
+
+        async def fake_fetch(session, url, semaphore):
+            raise RuntimeError("Connection failed")
+
+        monkeypatch.setattr(parser, "fetch", fake_fetch)
+
+        result = await parser.process_product(
+            session,
+            "https://example.com/product/42",
+            semaphore,
+            storage,
+        )
+
+        assert result is False
+        storage.save_price.assert_not_awaited()
 
     asyncio.run(run_test())

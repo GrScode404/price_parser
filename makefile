@@ -5,3 +5,14 @@ run:
 
 test:
 	poetry run pytest -v
+
+lint:
+	poetry run ruff check .
+
+fix:
+	poetry run ruff check --fix .
+	poetry run ruff format .
+
+.PHONY: run test lint fix typecheck
+typecheck:
+	poetry run mypy

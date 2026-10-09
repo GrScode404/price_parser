@@ -1,16 +1,12 @@
-from decimal import Decimal
-
 import asyncio
 import unittest
-from unittest.mock import AsyncMock
-
-import pytest
-
-from src.price_parser import parser
-from src.price_parser.parser import parse_price
+from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
-from unittest.mock import AsyncMock, MagicMock
+import pytest
+from src.price_parser import parser
+from src.price_parser.parser import parse_price
 
 
 def test_parse_price_returns_price():
@@ -30,6 +26,7 @@ def test_parse_price_returns_price():
 
     assert result == Decimal("155.62")
 
+
 def test_parse_price_without_json():
     content = "<html><body><h1>Product not found</h1></body></html>"
 
@@ -38,6 +35,7 @@ def test_parse_price_without_json():
         match="На странице не найден JSON с данными товара",
     ):
         parse_price(content)
+
 
 def test_parse_price_without_price_field():
     content = """
@@ -86,6 +84,7 @@ def test_parse_price_with_negative_value():
     ):
         parse_price(content)
 
+
 def test_process_product_handles_fetch_error(monkeypatch):
     async def run_test():
         session = AsyncMock()
@@ -93,11 +92,11 @@ def test_process_product_handles_fetch_error(monkeypatch):
         storage = AsyncMock()
 
         async def fake_fetch(
-                session, 
-                url, 
-                semaphore,
-                storage,
-            ):
+            session,
+            url,
+            semaphore,
+            storage,
+        ):
             raise RuntimeError("Connection failed")
 
         monkeypatch.setattr(parser, "fetch", fake_fetch)
@@ -113,6 +112,7 @@ def test_process_product_handles_fetch_error(monkeypatch):
 
     asyncio.run(run_test())
 
+
 def test_process_product_succeeds(monkeypatch):
     async def run_test():
         session = AsyncMock()
@@ -120,10 +120,10 @@ def test_process_product_succeeds(monkeypatch):
         storage = AsyncMock()
 
         async def fake_fetch(
-                session, 
-                url, 
-                semaphore,
-            ):
+            session,
+            url,
+            semaphore,
+        ):
             return """
             <html><body>
                 <pre>{"id": 1, "price": 123.45}</pre>
@@ -138,10 +138,11 @@ def test_process_product_succeeds(monkeypatch):
             semaphore,
             storage,
         )
-    
+
         assert result is True
 
     asyncio.run(run_test())
+
 
 def test_fetch_does_not_retry_404():
     async def run_test():
@@ -172,6 +173,7 @@ def test_fetch_does_not_retry_404():
         assert session.get.call_count == 1
 
     asyncio.run(run_test())
+
 
 def test_fetch_retries_on_503(monkeypatch):
     async def run_test():
@@ -216,6 +218,7 @@ def test_fetch_retries_on_503(monkeypatch):
         sleep_mock.assert_awaited_once_with(1)
 
     asyncio.run(run_test())
+
 
 def test_fetch_stops_after_max_attempts(monkeypatch):
     async def run_test():
@@ -262,6 +265,7 @@ def test_fetch_stops_after_max_attempts(monkeypatch):
 
     asyncio.run(run_test())
 
+
 def test_process_product_saves_price(monkeypatch):
     async def run_test():
         session = AsyncMock()
@@ -288,6 +292,7 @@ def test_process_product_saves_price(monkeypatch):
         storage.save_price.assert_awaited_once_with(42, Decimal("123.45"))
 
     asyncio.run(run_test())
+
 
 def test_process_product_does_not_save_price_on_fetch_error(monkeypatch):
     async def run_test():

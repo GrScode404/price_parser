@@ -9,7 +9,7 @@ class RedisStorage:
 
     async def save_price(self, product_id: int, price: Decimal) -> None:
         key = f"product:{product_id}"
-        await self.client.set(key, price)
+        await self.client.set(key, str(price))
 
     async def get_price(self, product_id: int) -> Decimal | None:
         key = f"product:{product_id}"
@@ -17,5 +17,8 @@ class RedisStorage:
 
         if value is None:
             return None
+        
+        if isinstance(value, bytes):
+            value = value.decode("utf-8")
 
         return Decimal(value)

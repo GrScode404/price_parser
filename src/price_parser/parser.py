@@ -1,15 +1,13 @@
-from decimal import Decimal
-
 import asyncio
 import json
 import os
+from decimal import Decimal
 
 import aiohttp
 import redis.asyncio as redis
 from lxml import html
 
 from price_parser.storage import RedisStorage
-
 
 MAX_ATTEMPTS = 3
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
@@ -34,10 +32,7 @@ async def fetch(
                     if response.status == 200:
                         return await response.text()
 
-                    if (
-                        response.status in RETRYABLE_STATUS
-                        and attempt < MAX_ATTEMPTS
-                    ):
+                    if response.status in RETRYABLE_STATUS and attempt < MAX_ATTEMPTS:
                         retry_after = response.headers.get("Retry-After")
 
                         if retry_after:
@@ -60,8 +55,7 @@ async def fetch(
 
         if attempt < MAX_ATTEMPTS:
             print(
-                f"Повтор {attempt + 1}/{MAX_ATTEMPTS}: "
-                f"{url}. Ждём {retry_delay} сек."
+                f"Повтор {attempt + 1}/{MAX_ATTEMPTS}: {url}. Ждём {retry_delay} сек."
             )
             await asyncio.sleep(retry_delay)
 
@@ -71,6 +65,9 @@ async def fetch(
 def parse_price(content: str) -> Decimal:
     tree = html.fromstring(content)
     json_text = tree.xpath("string(//pre)")
+
+    if not isinstance(json_text, str):
+        raise ValueError("Не удалось получить JSON со страницы")
 
     if not json_text.strip():
         raise ValueError("На странице не найден JSON с данными товара")
@@ -124,15 +121,7 @@ async def main() -> None:
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
             results = await asyncio.gather(
-                *[
-                    process_product(
-                        session,
-                        url, 
-                        semaphore,
-                        storage
-                    )
-                    for url in urls
-                ]
+                *[process_product(session, url, semaphore, storage) for url in urls]
             )
     finally:
         await redis_client.aclose()

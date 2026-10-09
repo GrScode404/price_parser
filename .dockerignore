@@ -8,3 +8,4 @@ __pycache__/
 .gitignore
 .dockerignore
 cron.log
+.vscode/

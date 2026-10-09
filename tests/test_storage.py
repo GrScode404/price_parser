@@ -1,3 +1,4 @@
+from decimal import Decimal
 from unittest.mock import AsyncMock
 
 import pytest
@@ -10,9 +11,10 @@ async def test_save_price():
     client = AsyncMock()
     storage = RedisStorage(client)
 
-    await storage.save_price(1, 155.62)
+    price = Decimal("155.62")
+    await storage.save_price(1, str(price))
 
-    client.set.assert_awaited_once_with("product:1", 155.62)
+    client.set.assert_awaited_once_with("product:1", "155.62")
 
 
 @pytest.mark.asyncio
@@ -24,7 +26,8 @@ async def test_get_price():
 
     result = await storage.get_price(1)
 
-    assert result == 155.62
+    assert result == Decimal("155.62")
+    assert isinstance(result, Decimal)
     client.get.assert_awaited_once_with("product:1")
 
 

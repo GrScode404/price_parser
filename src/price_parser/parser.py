@@ -1,3 +1,4 @@
+from decimal import Decimal
 
 import asyncio
 import json
@@ -67,23 +68,23 @@ async def fetch(
     raise RuntimeError(f"Не удалось получить страницу: {url}")
 
 
-def parse_price(content: str) -> float:
+def parse_price(content: str) -> Decimal:
     tree = html.fromstring(content)
     json_text = tree.xpath("string(//pre)")
 
     if not json_text.strip():
         raise ValueError("На странице не найден JSON с данными товара")
 
-    data = json.loads(json_text)
+    data = json.loads(json_text, parse_float=Decimal)
     price = data.get("price")
 
-    if isinstance(price, bool) or not isinstance(price, (int, float)):
+    if isinstance(price, bool) or not isinstance(price, (int, Decimal)):
         raise ValueError("Цена отсутствует или имеет неверный формат")
 
     if price < 0:
         raise ValueError(f"Цена не может быть отрицательной: {price}")
 
-    return float(price)
+    return Decimal(price)
 
 
 async def process_product(

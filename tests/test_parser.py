@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import asyncio
 import unittest
 from unittest.mock import AsyncMock
@@ -26,7 +28,7 @@ def test_parse_price_returns_price():
 
     result = parse_price(content)
 
-    assert result == 155.62
+    assert result == Decimal("155.62")
 
 def test_parse_price_without_json():
     content = "<html><body><h1>Product not found</h1></body></html>"
@@ -283,7 +285,7 @@ def test_process_product_saves_price(monkeypatch):
         )
 
         assert result is True
-        storage.save_price.assert_awaited_once_with(42, 123.45)
+        storage.save_price.assert_awaited_once_with(42, Decimal("123.45"))
 
     asyncio.run(run_test())
 

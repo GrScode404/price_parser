@@ -146,6 +146,7 @@ product:100
 * Docker
 * Docker Compose
 * Linux cron
+* Poetry — управление зависимостями и окружением
 * pytest
 * pytest-asyncio
 
@@ -166,8 +167,8 @@ price_parser/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── Makefile
+├── poetry.lock
 ├── pyproject.toml
-├── requirements.txt
 ├── .dockerignore
 ├── .gitignore
 └── README.md
@@ -199,11 +200,16 @@ price_parser/
 python3 -m venv .venv
 source .venv/bin/activate
 ```
-
-Установить зависимости:
+Установить зависимости проекта через Poetry:
 
 ```bash
-pip install -r requirements.txt
+poetry install
+```
+
+Запустить тесты:
+
+```bash
+poetry run pytest -v
 ```
 
 Запустить Redis.

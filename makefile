@@ -1,7 +1,7 @@
 .PHONY: run test
 
 run:
-	python src/price_parser/parser.py
+	poetry run python src/price_parser/parser.py
 
 test:
-	pytest
+	poetry run pytest -v

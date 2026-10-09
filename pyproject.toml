@@ -1,11 +1,25 @@
 [build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "price-parser"
 version = "0.1.0"
 description = "Asynchronous product price parser"
+requires-python = ">=3.12,<4.0"
+dependencies = [
+    "aiohttp==3.14.3",
+    "lxml==6.1.3",
+    "redis==8.1.0",
+]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+]
+
+[tool.poetry]
+packages = [
+    { include = "price_parser", from = "src" },
+]

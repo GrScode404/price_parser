@@ -110,21 +110,18 @@ async def main() -> None:
     semaphore = asyncio.Semaphore(10)
     timeout = aiohttp.ClientTimeout(total=15)
 
-    redis_client = redis.Redis(
+    async with redis.Redis(
         host=os.getenv("REDIS_HOST", "localhost"),
         port=int(os.getenv("REDIS_PORT", "6379")),
         db=0,
         decode_responses=True,
-    )
-    storage = RedisStorage(redis_client)
+    ) as redis_client:
+        storage = RedisStorage(redis_client)
 
-    try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
             results = await asyncio.gather(
                 *[process_product(session, url, semaphore, storage) for url in urls]
             )
-    finally:
-        await redis_client.aclose()
 
     successful = sum(results)
     failed = len(results) - successful

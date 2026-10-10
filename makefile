@@ -19,3 +19,10 @@ typecheck:
 
 format-check:
 	poetry run ruff format --check .
+
+.PHONY: check
+check:
+	poetry run ruff check .
+	poetry run ruff format --check .
+	poetry run mypy --strict src/price_parser
+	poetry run pytest -v

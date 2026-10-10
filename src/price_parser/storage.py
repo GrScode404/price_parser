@@ -17,7 +17,7 @@ class RedisStorage:
 
         if value is None:
             return None
-        
+
         if isinstance(value, bytes):
             value = value.decode("utf-8")
 

@@ -13,6 +13,9 @@ fix:
 	poetry run ruff check --fix .
 	poetry run ruff format .
 
-.PHONY: run test lint fix typecheck
+.PHONY: run test lint fix typecheck format-check
 typecheck:
 	poetry run mypy
+
+format-check:
+	poetry run ruff format --check .
